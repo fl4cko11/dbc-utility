@@ -21,24 +21,49 @@ func TestCommandExecution_Integration(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		args []string
+		name        string
+		args        []string
+		expectFatal bool
 	}{
 		{
-			name: "successful single DB removal",
-			args: []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass"},
+			name:        "successful single DB removal",
+			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass"},
+			expectFatal: false,
 		},
 		{
-			name: "successful multiple DBs removal",
-			args: []string{"cmd", "-databases=db1,db2", "-operation=remove", "-pgpass=pass"},
+			name:        "successful multiple DBs removal",
+			args:        []string{"cmd", "-databases=db1,db2", "-operation=remove", "-pgpass=pass"},
+			expectFatal: false,
 		},
 		{
-			name: "template db delete",
-			args: []string{"cmd", "-databases=db1%", "-operation=remove", "-pgpass=pass"},
+			name:        "template db removal",
+			args:        []string{"cmd", "-databases=db1%", "-operation=remove", "-pgpass=pass"},
+			expectFatal: false,
 		},
 		{
-			name: "single db and template",
-			args: []string{"cmd", "-databases=db1,db2%", "-operation=remove", "-pgpass=pass"},
+			name:        "single db and template removal",
+			args:        []string{"cmd", "-databases=db1,db2%", "-operation=remove", "-pgpass=pass"},
+			expectFatal: false,
+		},
+		{
+			name:        "importand db [postgres] removal",
+			args:        []string{"cmd", "-databases=postgres", "-operation=remove", "-pgpass=pass"},
+			expectFatal: true,
+		},
+		{
+			name:        "importand db [template0] removal",
+			args:        []string{"cmd", "-databases=template0", "-operation=remove", "-pgpass=pass"},
+			expectFatal: true,
+		},
+		{
+			name:        "importand db [template1] removal",
+			args:        []string{"cmd", "-databases=template1", "-operation=remove", "-pgpass=pass"},
+			expectFatal: true,
+		},
+		{
+			name:        "many importand db removal",
+			args:        []string{"cmd", "-databases=template1,postgres", "-operation=remove", "-pgpass=pass"},
+			expectFatal: true,
 		},
 	}
 
@@ -77,6 +102,16 @@ func TestCommandExecution_Integration(t *testing.T) {
 					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s", dbName)).WillReturnResult(pgxmock.NewResult("DROP", 1))
 				}
 			}
+
+			defer func() { // если ожидаемая ошибка, то это не считается фэйлом теста
+				if r := recover(); r != nil {
+					if !tt.expectFatal {
+						t.Errorf("Неожиданная ошибка: %v", r)
+					} else {
+						t.Logf("Ожидаемая ошибка: %v", r)
+					}
+				}
+			}()
 
 			ctx := context.Background()
 			ce.CommandExecution(ctx, mock, args, testLogger)
