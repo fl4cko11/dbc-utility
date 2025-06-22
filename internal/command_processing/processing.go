@@ -2,19 +2,22 @@ package CommandProcessing
 
 import (
 	"flag"
+	"os"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
 func CommandProcessing(logger *logrus.Logger) CommandArgs {
-	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных в формате -databses=db1,db2")
+	logger.Debugf("Получили командную строку: %q", strings.Join(os.Args, " "))
+
+	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных в формате -databases=db1,db2")
 	logger.Debugf("Заполнили имена баз данных значением по умолчанию: %s", *dbNamesWoParse)
 
-	operationType := flag.String("operation", "none", "Тип операции: backup|remove")
+	operationType := flag.String("operation", "none", "Тип операции: backup|remove в формате -operation=")
 	logger.Debugf("Заполнили тип операции значением по умолчанию: %s", *operationType)
 
-	postgresPasswordURL := flag.String("pgpass", "none", "Пароль от вашего пользователя postgres на машине")
+	postgresPasswordURL := flag.String("pgpass", "none", "Пароль от вашего пользователя postgres (если в вашем pg_hba.conf не установлен trust для local) на машине в формате -pgpass=")
 	logger.Debugf("Заполнили postgresPassword значением по умолчанию: %s", *postgresPasswordURL)
 
 	flag.Parse()
@@ -23,19 +26,15 @@ func CommandProcessing(logger *logrus.Logger) CommandArgs {
 	logger.Debugf("Считали postgresPassword: %s", *postgresPasswordURL)
 
 	if *dbNamesWoParse == "none" {
-		logger.Fatal("Не введены имена баз данных. *Требуемый формат: -databses=db1,db2")
+		logger.Fatal("Не введены имена баз данных. *Требуемый формат: -databases=db1,db2")
 	}
 
 	if *operationType == "none" {
 		logger.Fatal("Не введён тип операции")
 	}
 
-	if *postgresPasswordURL == "none" {
-		logger.Fatal("Не введён postgresPassword")
-	}
-
 	dbNames := strings.Split(*dbNamesWoParse, ",")
-	logger.Debugf("Распарсили имена строк в массив: %v (тип: %T)", dbNames, dbNames)
+	logger.Debugf("Распарсили имена строк в массив: %q (тип: %T)", dbNames, dbNames)
 
 	logger.Info("Успешно обработали команду")
 
