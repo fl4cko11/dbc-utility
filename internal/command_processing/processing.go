@@ -9,15 +9,15 @@ import (
 )
 
 func CommandProcessing(logger *logrus.Logger) CommandArgs {
-	logger.Debugf("Получили командную строку: %q", strings.Join(os.Args, " "))
+	logger.Infof("Получили командную строку: %q", strings.Join(os.Args, " "))
 
-	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных в формате -databases=db1,db2")
+	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных в формате -databases=db1,db2,template%")
 	logger.Debugf("Заполнили имена баз данных значением по умолчанию: %s", *dbNamesWoParse)
 
 	operationType := flag.String("operation", "none", "Тип операции: backup|remove в формате -operation=")
 	logger.Debugf("Заполнили тип операции значением по умолчанию: %s", *operationType)
 
-	postgresPasswordURL := flag.String("pgpass", "none", "Пароль от вашего пользователя postgres (если в вашем pg_hba.conf не установлен trust для local) на машине в формате -pgpass=")
+	postgresPasswordURL := flag.String("pgpass", "none", "Пароль от вашего пользователя postgres на машине (если в вашем pg_hba.conf не установлен trust для local) в формате -pgpass=")
 	logger.Debugf("Заполнили postgresPassword значением по умолчанию: %s", *postgresPasswordURL)
 
 	flag.Parse()

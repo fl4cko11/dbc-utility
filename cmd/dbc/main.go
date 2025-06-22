@@ -28,7 +28,7 @@ func main() {
 	ctx := context.Background()
 	conn, errc := pgx.Connect(ctx, dbURLs)
 	if errc != nil {
-		logger.Fatal("Не удалось подключиться к базе данных")
+		logger.Fatalf("Не удалось подключиться к базе данных, ошибка: %v", errc)
 	}
 	defer conn.Close(ctx)
 	logger.Info("Успешно установили соединение с БД")

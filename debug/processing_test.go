@@ -31,6 +31,16 @@ func TestCommandProcessing(t *testing.T) {
 			expectFatal: false,
 		},
 		{
+			name:        "valid args with single template",
+			args:        []string{"cmd", "-databases=db1%", "-operation=backup", "-pgpass=pass"},
+			expectFatal: false,
+		},
+		{
+			name:        "valid args with args and templates",
+			args:        []string{"cmd", "-databases=db1,db2%,db3%", "-operation=backup", "-pgpass=pass"},
+			expectFatal: false,
+		},
+		{
 			name:        "missing databases",
 			args:        []string{"cmd", "-operation=backup", "-pgpass=pass"},
 			expectFatal: true,
