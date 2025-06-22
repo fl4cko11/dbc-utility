@@ -12,10 +12,11 @@ import (
 	cp "github.com/fl4cko11/dbc-utility/internal/command_processing"
 	"github.com/fl4cko11/dbc-utility/logs"
 	"github.com/pashagolub/pgxmock/v2"
+	"github.com/sirupsen/logrus"
 )
 
-func TestCommandExecution_Integration(t *testing.T) {
-	testLogger := logs.InitLogger(os.Stderr)
+func TestCommandRemoveExecution(t *testing.T) {
+	testLogger := logs.InitLogger(os.Stderr, false)
 	testLogger.ExitFunc = func(code int) {
 		panic("fatal error occurred") // Чтобы после log.Fatal() функцией выхода была panic() а не ox.Exit (чтобы все тесты прогнать)
 	}
@@ -27,48 +28,60 @@ func TestCommandExecution_Integration(t *testing.T) {
 	}{
 		{
 			name:        "successful single DB removal",
-			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: false,
 		},
 		{
 			name:        "successful multiple DBs removal",
-			args:        []string{"cmd", "-databases=db1,db2", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=db1,db2", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: false,
 		},
 		{
 			name:        "template db removal",
-			args:        []string{"cmd", "-databases=db1%", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=db1%", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: false,
 		},
 		{
 			name:        "single db and template removal",
-			args:        []string{"cmd", "-databases=db1,db2%", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=db1,db2%", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: false,
 		},
 		{
 			name:        "importand db [postgres] removal",
-			args:        []string{"cmd", "-databases=postgres", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=postgres", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: true,
 		},
 		{
 			name:        "importand db [template0] removal",
-			args:        []string{"cmd", "-databases=template0", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=template0", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: true,
 		},
 		{
 			name:        "importand db [template1] removal",
-			args:        []string{"cmd", "-databases=template1", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=template1", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: true,
 		},
 		{
 			name:        "many importand db removal",
-			args:        []string{"cmd", "-databases=template1,postgres", "-operation=remove", "-pgpass=pass"},
+			args:        []string{"cmd", "-databases=template1,postgres", "-operation=remove", "-pgpass=pass", "-debug"},
 			expectFatal: true,
+		},
+		{
+			name:        "WO debug flag",
+			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass"},
+			expectFatal: false,
+		},
+		{
+			name:        "helper flag wo operation",
+			args:        []string{"cmd", "-h", "-databases=testdb"},
+			expectFatal: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			testLogger.SetLevel(logrus.InfoLevel) // сбрасываем до info уровня в каждом тесте, чтобы тестировать наличие -debug флага
+
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Ошибка: %v", r)
@@ -86,38 +99,43 @@ func TestCommandExecution_Integration(t *testing.T) {
 			}
 			defer mock.Close(context.Background())
 
-			for _, dbName := range args.DbNames {
-				if strings.Contains(dbName, "%") {
-					dbNameWoPersent := strings.Trim(dbName, "%")
+			if args.OperationType != "none" {
+				for _, dbName := range args.DbNames {
+					if strings.Contains(dbName, "%") {
+						dbNameWoPersent := strings.Trim(dbName, "%")
 
-					rows := mock.NewRows([]string{"datname"})
-					rows.AddRow(fmt.Sprintf("%s_a", dbNameWoPersent))
-					rows.AddRow(fmt.Sprintf("%s_b", dbNameWoPersent))
+						rows := mock.NewRows([]string{"datname"})
+						rows.AddRow(fmt.Sprintf("%s_a", dbNameWoPersent))
+						rows.AddRow(fmt.Sprintf("%s_b", dbNameWoPersent))
 
-					mock.ExpectQuery(fmt.Sprintf("SELECT datname FROM pg_database WHERE datname LIKE '%s' AND datistemplate = false AND datname NOT IN ('postgres','template0','template1');", dbName)).WillReturnRows(rows)
+						mock.ExpectQuery(fmt.Sprintf("SELECT datname FROM pg_database WHERE datname LIKE '%s' AND datistemplate = false AND datname NOT IN ('postgres','template0','template1');", dbName)).WillReturnRows(rows)
 
-					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_a", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
-					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_b", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
-				} else {
-					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s", dbName)).WillReturnResult(pgxmock.NewResult("DROP", 1))
-				}
-			}
-
-			defer func() { // если ожидаемая ошибка, то это не считается фэйлом теста
-				if r := recover(); r != nil {
-					if !tt.expectFatal {
-						t.Errorf("Неожиданная ошибка: %v", r)
+						mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_a", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
+						mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_b", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
 					} else {
-						t.Logf("Ожидаемая ошибка: %v", r)
+						mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s", dbName)).WillReturnResult(pgxmock.NewResult("DROP", 1))
 					}
 				}
-			}()
 
-			ctx := context.Background()
-			ce.CommandExecution(ctx, mock, args, testLogger)
+				defer func() { // если ожидаемая ошибка, то это не считается фэйлом теста
+					if r := recover(); r != nil {
+						if !tt.expectFatal {
+							t.Errorf("Неожиданная ошибка: %v", r)
+						} else {
+							t.Logf("Ожидаемая ошибка: %v", r)
+						}
+					}
+				}()
 
-			if err := mock.ExpectationsWereMet(); err != nil {
-				t.Errorf("Ожидаемые запросы не выполнены: %v", err)
+				ctx := context.Background()
+				ce.CommandExecution(ctx, mock, args, testLogger)
+
+				if err := mock.ExpectationsWereMet(); err != nil {
+					t.Errorf("Ожидаемые запросы не выполнены: %v", err)
+				}
+			} else {
+				ctx := context.Background()
+				ce.CommandExecution(ctx, mock, args, testLogger)
 			}
 		})
 	}

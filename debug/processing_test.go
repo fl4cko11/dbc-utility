@@ -10,7 +10,7 @@ import (
 )
 
 func TestCommandProcessing(t *testing.T) {
-	testLogger := logs.InitLogger(os.Stderr)
+	testLogger := logs.InitLogger(os.Stderr, true)
 	testLogger.ExitFunc = func(code int) {
 		panic("fatal error occurred") // Чтобы после log.Fatal() функцией выхода была panic() а не ox.Exit (чтобы все тесты прогнать)
 	}
@@ -52,8 +52,28 @@ func TestCommandProcessing(t *testing.T) {
 		},
 		{
 			name:        "none values",
-			args:        []string{"cmd", "-databases=none", "-operation=none", "-pgpass=none"},
+			args:        []string{"cmd", "-databases=db1", "-pgpass=pass"},
 			expectFatal: true,
+		},
+		{
+			name:        "debug flag",
+			args:        []string{"cmd", "-debug", "-databases=db1", "-operation=backup", "-pgpass=pass"},
+			expectFatal: false,
+		},
+		{
+			name:        "help flag",
+			args:        []string{"cmd", "-h", "-databases=db1", "-operation=backup", "-pgpass=pass"},
+			expectFatal: false,
+		},
+		{
+			name:        "check WARN if wo password",
+			args:        []string{"cmd", "-h", "-databases=db1", "-operation=backup"},
+			expectFatal: false,
+		},
+		{
+			name:        "check operationless but helper flag",
+			args:        []string{"cmd", "-h", "-databases=db1"},
+			expectFatal: false,
 		},
 	}
 

@@ -12,7 +12,11 @@ import (
 )
 
 func main() {
-	logger := logs.InitLogger(os.Stderr)
+	// пользователю не нужна debug информация исполнения по умолчанию
+	// тем более информация о процессе парсинга
+	// она доступна только в тестах на уровне разработчика
+	// если хотим увидеть, то можно реализовать на уровне main парсинг флага -debug
+	logger := logs.InitLogger(os.Stderr, false)
 
 	args := cp.CommandProcessing(logger)
 

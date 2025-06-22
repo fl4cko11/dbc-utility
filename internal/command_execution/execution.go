@@ -17,6 +17,39 @@ type DBConn interface { // Для возможности mock-тестирова
 }
 
 func CommandExecution(ctx context.Context, conn DBConn, args cp.CommandArgs, logger *logrus.Logger) {
+	if args.HelperDump {
+		logger.Info("\n")
+		logger.Info("Утилита для мэнэджмента баз данных PostgreSQL\n")
+		logger.Info("Доступные флаги:")
+		logger.Info("  -h\t\tВывод этой справки")
+		logger.Info("  -debug\tВключение подробного логгирования (отладочная информация)")
+		logger.Info("  -databases\tСписок баз данных для обработки. Форматы:")
+		logger.Info("    \t\t- Конкретные БД: -databases=db1,db2")
+		logger.Info("    \t\t- По шаблону: -databases=test% (удалит test1, test_old и т.д.)")
+		logger.Info("    \t\t- Значение по умолчанию: none")
+		logger.Info("  -operation\tТип выполняемой операции. Доступные значения:")
+		logger.Info("    \t\t- remove - удаление указанных баз данных")
+		logger.Info("    \t\t- backup - создание бэкапа")
+		logger.Info("    \t\t- Значение по умолчанию: none")
+		logger.Info("  -pgpass\tПароль пользователя PostgreSQL. Используется если:")
+		logger.Info("    \t\t- В pg_hba.conf не установлен trust для local соединений")
+		logger.Info("    \t\t- Значение по умолчанию: none")
+		logger.Info("Важные ограничения:")
+		logger.Info("  - Нельзя удалять системные БД: postgres, template0, template1")
+		logger.Info("  - Шаблонные имена (с %) работают только для операции remove")
+		logger.Info("Примеры использования:")
+		logger.Info("  Удаление конкретных БД:\t dbc-utility -databases=old_db,test_db -operation=remove -pgpass=123")
+		logger.Info("  Удаление по шаблону:\t\t dbc-utility -databases=temp% -operation=remove -debug")
+		logger.Info("  Просмотр справки:\t\t dbc-utility -h")
+		logger.Info("")
+	}
+
+	if args.DebugInfo { // если пользователь потребовал debug информацию
+		logger.SetLevel(logrus.TraceLevel)
+	} else {
+		logger.SetLevel(logrus.InfoLevel)
+	}
+
 	if args.OperationType == "remove" {
 		for _, val := range args.DbNames {
 			logger.Debugf("Приняли имя БД для удаления: %q", val)

@@ -11,6 +11,12 @@ import (
 func CommandProcessing(logger *logrus.Logger) CommandArgs {
 	logger.Infof("Получили командную строку: %q", strings.Join(os.Args, " "))
 
+	helpDump := flag.Bool("h", false, "Вывод опций")
+	logger.Debugf("Заполнили helpDump по умолчанию: %v", *helpDump)
+
+	debugInfo := flag.Bool("debug", false, "Включить дебаг информацию")
+	logger.Debugf("Заполнили debugInfo по умолчанию: %v", *debugInfo)
+
 	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных в формате -databases=db1,db2,template%")
 	logger.Debugf("Заполнили имена баз данных значением по умолчанию: %s", *dbNamesWoParse)
 
@@ -24,12 +30,20 @@ func CommandProcessing(logger *logrus.Logger) CommandArgs {
 	logger.Debugf("Считали Имена баз данных: %s", *dbNamesWoParse)
 	logger.Debugf("Считали Тип Операции: %s", *operationType)
 	logger.Debugf("Считали postgresPassword: %s", *postgresPasswordURL)
+	logger.Debugf("Считали helpDump: %v", *helpDump)
+	logger.Debugf("Считали debugInfo: %v", *debugInfo)
 
-	if *dbNamesWoParse == "none" {
-		logger.Fatal("Не введены имена баз данных. *Требуемый формат: -databases=db1,db2")
-	}
+	if *operationType != "none" {
+		if *dbNamesWoParse == "none" {
+			logger.Fatal("Не введены имена баз данных. *Требуемый формат: -databases=db1,db2")
+		}
 
-	if *operationType == "none" {
+		if *postgresPasswordURL == "none" {
+			logger.Warn("ВНИМАНИЕ! Вы не ввели пароль от пользователя postgres, проверьте, что в вашем pg_hba.conf установлен trust для local")
+		}
+
+	} else if *helpDump {
+	} else {
 		logger.Fatal("Не введён тип операции")
 	}
 
@@ -38,5 +52,5 @@ func CommandProcessing(logger *logrus.Logger) CommandArgs {
 
 	logger.Info("Успешно обработали команду")
 
-	return CommandArgs{DbNames: dbNames, OperationType: *operationType, PostgresPasswordURL: *postgresPasswordURL}
+	return CommandArgs{DbNames: dbNames, OperationType: *operationType, PostgresPasswordURL: *postgresPasswordURL, HelperDump: *helpDump, DebugInfo: *debugInfo}
 }
