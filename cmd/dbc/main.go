@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	logger := logs.InitLogger(os.Stderr, false)
+	logger := logs.InitLogger(os.Stderr)
 
 	args := cp.CommandProcessing(logger)
 

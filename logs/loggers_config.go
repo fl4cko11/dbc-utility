@@ -32,16 +32,10 @@ func (f *dynamicFormatter) Format(entry *logrus.Entry) ([]byte, error) { // мо
 	return f.ErrorFormatter.Format(entry)
 }
 
-func InitLogger(out io.Writer, debugInfo bool) *logrus.Logger {
+func InitLogger(out io.Writer) *logrus.Logger {
 	logger := logrus.New()
 
 	logger.SetReportCaller(true)
-
-	if debugInfo {
-		logger.SetLevel(logrus.TraceLevel)
-	} else {
-		logger.SetLevel(logrus.InfoLevel)
-	}
 
 	logger.SetFormatter(&dynamicFormatter{
 		InfoFormatter: &logrus.TextFormatter{

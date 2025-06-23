@@ -10,7 +10,7 @@ import (
 )
 
 func TestCommandProcessing(t *testing.T) {
-	testLogger := logs.InitLogger(os.Stderr, false) // выключаем дебаг инфо для теста флага -debug
+	testLogger := logs.InitLogger(os.Stderr) // выключаем дебаг инфо для теста флага -debug
 	testLogger.ExitFunc = func(code int) {
 		panic("fatal error occurred") // Чтобы после log.Fatal() функцией выхода была panic() а не ox.Exit (чтобы все тесты прогнать)
 	}

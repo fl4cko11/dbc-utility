@@ -15,7 +15,7 @@ import (
 )
 
 func TestCommandExecution(t *testing.T) {
-	testLogger := logs.InitLogger(os.Stderr, false)
+	testLogger := logs.InitLogger(os.Stderr)
 	testLogger.ExitFunc = func(code int) {
 		panic("fatal error occurred") // Чтобы после log.Fatal() функцией выхода была panic() а не ox.Exit (чтобы все тесты прогнать)
 	}
