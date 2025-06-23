@@ -12,13 +12,17 @@ import (
 )
 
 func main() {
-	// пользователю не нужна debug информация исполнения по умолчанию
-	// тем более информация о процессе парсинга
-	// она доступна только в тестах на уровне разработчика
-	// если хотим увидеть, то можно реализовать на уровне main парсинг флага -debug
 	logger := logs.InitLogger(os.Stderr, false)
 
 	args := cp.CommandProcessing(logger)
+
+	if args.HavingHelpFlag {
+		ce.HelpFlagsExecution(args, logger)
+		if args.OperationType == "none" { // если нет операции с СУБД, то нет смысла подключаться к БД, просто исполняем вспомогательные флаги и завершаем
+			logger.Warn("ВНИМАНИЕ! Вы не ввели команду для работы с СУБД")
+			return
+		}
+	}
 
 	dbURL := &url.URL{
 		Scheme: "postgres",
@@ -35,7 +39,7 @@ func main() {
 		logger.Fatalf("Не удалось подключиться к базе данных, ошибка: %v", errc)
 	}
 	defer conn.Close(ctx)
-	logger.Info("Успешно установили соединение с БД")
+	logger.Info("Успешно установили соединение с СУБД")
 
-	ce.CommandExecution(ctx, conn, args, logger)
+	ce.DBMSFlagsExecution(ctx, conn, args, logger)
 }

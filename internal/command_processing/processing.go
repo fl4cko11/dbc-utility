@@ -11,27 +11,30 @@ import (
 func CommandProcessing(logger *logrus.Logger) CommandArgs {
 	logger.Infof("Получили командную строку: %q", strings.Join(os.Args, " "))
 
-	helpDump := flag.Bool("h", false, "Вывод опций")
-	logger.Debugf("Заполнили helpDump по умолчанию: %v", *helpDump)
+	helpDump := flag.Bool("h", false, "Вывод опций флаг в формате -h")
 
-	debugInfo := flag.Bool("debug", false, "Включить дебаг информацию")
-	logger.Debugf("Заполнили debugInfo по умолчанию: %v", *debugInfo)
+	debugInfo := flag.Bool("debug", false, "Включить дебаг информацию флаг в формате -debug")
 
-	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных в формате -databases=db1,db2,template%")
-	logger.Debugf("Заполнили имена баз данных значением по умолчанию: %s", *dbNamesWoParse)
+	dbNamesWoParse := flag.String("databases", "none", "Имена баз данных флаг в формате -databases=db1,db2,template%")
 
-	operationType := flag.String("operation", "none", "Тип операции: backup|remove в формате -operation=")
-	logger.Debugf("Заполнили тип операции значением по умолчанию: %s", *operationType)
+	operationType := flag.String("operation", "none", "Тип операции: backup|remove флаг в формате -operation=")
 
-	postgresPasswordURL := flag.String("pgpass", "none", "Пароль от вашего пользователя postgres на машине (если в вашем pg_hba.conf не установлен trust для local) в формате -pgpass=")
-	logger.Debugf("Заполнили postgresPassword значением по умолчанию: %s", *postgresPasswordURL)
+	postgresPasswordURL := flag.String("pgpass", "none", "Пароль от вашего пользователя postgres на машине (если в вашем pg_hba.conf не установлен trust для local) флаг в формате -pgpass=")
 
 	flag.Parse()
-	logger.Debugf("Считали Имена баз данных: %s", *dbNamesWoParse)
-	logger.Debugf("Считали Тип Операции: %s", *operationType)
-	logger.Debugf("Считали postgresPassword: %s", *postgresPasswordURL)
-	logger.Debugf("Считали helpDump: %v", *helpDump)
-	logger.Debugf("Считали debugInfo: %v", *debugInfo)
+	logger.Infof("Считали Имена баз данных: %s", *dbNamesWoParse)
+	logger.Infof("Считали Тип Операции: %s", *operationType)
+	logger.Infof("Считали postgresPassword: %s", *postgresPasswordURL)
+	logger.Infof("Считали helpDump: %v", *helpDump)
+	logger.Infof("Считали debugInfo: %v", *debugInfo)
+
+	if *debugInfo { // если пользователь потребовал debug информацию
+		logger.SetLevel(logrus.TraceLevel)
+	} else {
+		logger.SetLevel(logrus.InfoLevel)
+	}
+
+	args := CommandArgs{DbNames: []string{"none"}, OperationType: *operationType, HavingHelpFlag: false, HelperDump: false}
 
 	if *operationType != "none" {
 		if *dbNamesWoParse == "none" {
@@ -42,15 +45,16 @@ func CommandProcessing(logger *logrus.Logger) CommandArgs {
 			logger.Warn("ВНИМАНИЕ! Вы не ввели пароль от пользователя postgres, проверьте, что в вашем pg_hba.conf установлен trust для local")
 		}
 
-	} else if *helpDump {
-	} else {
-		logger.Fatal("Не введён тип операции")
+		dbNames := strings.Split(*dbNamesWoParse, ",")
+		logger.Debugf("Распарсили имена строк в массив: %q (тип: %T)", dbNames, dbNames)
+		args.DbNames = dbNames
 	}
-
-	dbNames := strings.Split(*dbNamesWoParse, ",")
-	logger.Debugf("Распарсили имена строк в массив: %q (тип: %T)", dbNames, dbNames)
-
 	logger.Info("Успешно обработали команду")
 
-	return CommandArgs{DbNames: dbNames, OperationType: *operationType, PostgresPasswordURL: *postgresPasswordURL, HelperDump: *helpDump, DebugInfo: *debugInfo}
+	args.HelperDump = *helpDump
+	if *helpDump {
+		args.HavingHelpFlag = true
+	}
+
+	return args
 }

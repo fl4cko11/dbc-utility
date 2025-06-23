@@ -12,10 +12,9 @@ import (
 	cp "github.com/fl4cko11/dbc-utility/internal/command_processing"
 	"github.com/fl4cko11/dbc-utility/logs"
 	"github.com/pashagolub/pgxmock/v2"
-	"github.com/sirupsen/logrus"
 )
 
-func TestCommandRemoveExecution(t *testing.T) {
+func TestCommandExecution(t *testing.T) {
 	testLogger := logs.InitLogger(os.Stderr, false)
 	testLogger.ExitFunc = func(code int) {
 		panic("fatal error occurred") // Чтобы после log.Fatal() функцией выхода была panic() а не ox.Exit (чтобы все тесты прогнать)
@@ -29,6 +28,11 @@ func TestCommandRemoveExecution(t *testing.T) {
 		{
 			name:        "successful single DB removal",
 			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass", "-debug"},
+			expectFatal: false,
+		},
+		{
+			name:        "successful single DB removal wo debug",
+			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass"},
 			expectFatal: false,
 		},
 		{
@@ -67,21 +71,14 @@ func TestCommandRemoveExecution(t *testing.T) {
 			expectFatal: true,
 		},
 		{
-			name:        "WO debug flag",
-			args:        []string{"cmd", "-databases=testdb", "-operation=remove", "-pgpass=pass"},
-			expectFatal: false,
-		},
-		{
-			name:        "helper flag wo operation",
-			args:        []string{"cmd", "-h", "-databases=testdb"},
+			name:        "only halper flag",
+			args:        []string{"cmd", "-h"},
 			expectFatal: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testLogger.SetLevel(logrus.InfoLevel) // сбрасываем до info уровня в каждом тесте, чтобы тестировать наличие -debug флага
-
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Ошибка: %v", r)
@@ -93,49 +90,53 @@ func TestCommandRemoveExecution(t *testing.T) {
 
 			args := cp.CommandProcessing(testLogger)
 
+			// Тестируем логику сразу при возможном наличии вспомогательных флагов
+			if args.HavingHelpFlag {
+				ce.HelpFlagsExecution(args, testLogger)
+				if args.OperationType == "none" { // если нет операции с СУБД, то нет смысла подключаться к БД, просто исполняем вспомогательные флаги и завершаем
+					testLogger.Warn("ВНИМАНИЕ! Вы не ввели команду для работы с СУБД")
+					return
+				}
+			}
+
 			mock, err := pgxmock.NewConn(pgxmock.QueryMatcherOption(pgxmock.QueryMatcherEqual)) // обязательно включаю сравнение юнит запроса и мок запроса как строки
 			if err != nil {
 				t.Fatalf("Не удалось создать mock подключение: %v", err)
 			}
 			defer mock.Close(context.Background())
 
-			if args.OperationType != "none" {
-				for _, dbName := range args.DbNames {
-					if strings.Contains(dbName, "%") {
-						dbNameWoPersent := strings.Trim(dbName, "%")
+			for _, dbName := range args.DbNames {
+				if strings.Contains(dbName, "%") {
+					dbNameWoPersent := strings.Trim(dbName, "%")
 
-						rows := mock.NewRows([]string{"datname"})
-						rows.AddRow(fmt.Sprintf("%s_a", dbNameWoPersent))
-						rows.AddRow(fmt.Sprintf("%s_b", dbNameWoPersent))
+					rows := mock.NewRows([]string{"datname"})
+					rows.AddRow(fmt.Sprintf("%s_a", dbNameWoPersent))
+					rows.AddRow(fmt.Sprintf("%s_b", dbNameWoPersent))
 
-						mock.ExpectQuery(fmt.Sprintf("SELECT datname FROM pg_database WHERE datname LIKE '%s' AND datistemplate = false AND datname NOT IN ('postgres','template0','template1');", dbName)).WillReturnRows(rows)
+					mock.ExpectQuery(fmt.Sprintf("SELECT datname FROM pg_database WHERE datname LIKE '%s' AND datistemplate = false AND datname NOT IN ('postgres','template0','template1');", dbName)).WillReturnRows(rows)
 
-						mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_a", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
-						mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_b", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
+					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_a", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
+					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s_b", dbNameWoPersent)).WillReturnResult(pgxmock.NewResult("DROP", 1))
+				} else {
+					mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s", dbName)).WillReturnResult(pgxmock.NewResult("DROP", 1))
+				}
+			}
+
+			defer func() { // если ожидаемая ошибка, то это не считается фэйлом теста
+				if r := recover(); r != nil {
+					if !tt.expectFatal {
+						t.Errorf("Неожиданная ошибка: %v", r)
 					} else {
-						mock.ExpectExec(fmt.Sprintf("DROP DATABASE %s", dbName)).WillReturnResult(pgxmock.NewResult("DROP", 1))
+						t.Logf("Ожидаемая ошибка: %v", r)
 					}
 				}
+			}()
 
-				defer func() { // если ожидаемая ошибка, то это не считается фэйлом теста
-					if r := recover(); r != nil {
-						if !tt.expectFatal {
-							t.Errorf("Неожиданная ошибка: %v", r)
-						} else {
-							t.Logf("Ожидаемая ошибка: %v", r)
-						}
-					}
-				}()
+			ctx := context.Background()
+			ce.DBMSFlagsExecution(ctx, mock, args, testLogger)
 
-				ctx := context.Background()
-				ce.CommandExecution(ctx, mock, args, testLogger)
-
-				if err := mock.ExpectationsWereMet(); err != nil {
-					t.Errorf("Ожидаемые запросы не выполнены: %v", err)
-				}
-			} else {
-				ctx := context.Background()
-				ce.CommandExecution(ctx, mock, args, testLogger)
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("Ожидаемые запросы не выполнены: %v", err)
 			}
 		})
 	}

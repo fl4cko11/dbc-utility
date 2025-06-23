@@ -16,10 +16,10 @@ type DBConn interface { // Для возможности mock-тестирова
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
-func CommandExecution(ctx context.Context, conn DBConn, args cp.CommandArgs, logger *logrus.Logger) {
+func HelpFlagsExecution(args cp.CommandArgs, logger *logrus.Logger) {
 	if args.HelperDump {
 		logger.Info("\n")
-		logger.Info("Утилита для мэнэджмента баз данных PostgreSQL\n")
+		logger.Info("Утилита для мэнэджмента СУБД PostgreSQL\n")
 		logger.Info("Доступные флаги:")
 		logger.Info("  -h\t\tВывод этой справки")
 		logger.Info("  -debug\tВключение подробного логгирования (отладочная информация)")
@@ -43,13 +43,9 @@ func CommandExecution(ctx context.Context, conn DBConn, args cp.CommandArgs, log
 		logger.Info("  Просмотр справки:\t\t dbc-utility -h")
 		logger.Info("")
 	}
+}
 
-	if args.DebugInfo { // если пользователь потребовал debug информацию
-		logger.SetLevel(logrus.TraceLevel)
-	} else {
-		logger.SetLevel(logrus.InfoLevel)
-	}
-
+func DBMSFlagsExecution(ctx context.Context, conn DBConn, args cp.CommandArgs, logger *logrus.Logger) {
 	if args.OperationType == "remove" {
 		for _, val := range args.DbNames {
 			logger.Debugf("Приняли имя БД для удаления: %q", val)
@@ -68,8 +64,20 @@ func CommandExecution(ctx context.Context, conn DBConn, args cp.CommandArgs, log
 				defer rows.Close()
 				logger.Debug("Получили строки с именами БД для шаблона")
 
+				if !rows.Next() {
+					logger.Errorf("Нет БД, соответствующих шаблону: %s", val)
+					continue
+				}
+
 				var dbName string
 				var dbList []string
+
+				if err_s := rows.Scan(&dbName); err_s != nil { // т.к. выше мы сделаели некст - одну считываем
+					logger.Fatalf("Ошибка при сканировании имени БД: %v", err_s)
+				}
+				logger.Debugf("Считали имя БД соответствующее шаблону %s: %s", val, dbName)
+				dbList = append(dbList, dbName)
+
 				for rows.Next() {
 					errS := rows.Scan(&dbName)
 					if errS != nil {
